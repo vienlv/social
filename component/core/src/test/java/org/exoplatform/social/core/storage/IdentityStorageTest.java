@@ -4,6 +4,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.chromattic.api.RelationshipType;
 import org.exoplatform.social.core.identity.SpaceMemberFilterListAccess.Type;
 import org.exoplatform.social.core.identity.model.Identity;
 import org.exoplatform.social.core.identity.model.Profile;
@@ -11,11 +12,13 @@ import org.exoplatform.social.core.identity.provider.OrganizationIdentityProvide
 import org.exoplatform.social.core.identity.provider.SpaceIdentityProvider;
 import org.exoplatform.social.core.model.AvatarAttachment;
 import org.exoplatform.social.core.profile.ProfileFilter;
+import org.exoplatform.social.core.relationship.model.Relationship;
 import org.exoplatform.social.core.service.LinkProvider;
 import org.exoplatform.social.core.space.SpaceUtils;
 import org.exoplatform.social.core.space.impl.DefaultSpaceApplicationHandler;
 import org.exoplatform.social.core.space.model.Space;
 import org.exoplatform.social.core.storage.api.IdentityStorage;
+import org.exoplatform.social.core.storage.api.RelationshipStorage;
 import org.exoplatform.social.core.storage.api.SpaceStorage;
 import org.exoplatform.social.core.storage.cache.CachedIdentityStorage;
 import org.exoplatform.social.core.storage.cache.CachedSpaceStorage;
@@ -35,15 +38,19 @@ import org.exoplatform.social.core.test.QueryNumberTest;
 @QueryNumberTest
 public class IdentityStorageTest extends AbstractCoreTest {
   private IdentityStorage identityStorage;
+  private RelationshipStorage relationshipStorage;
   private SpaceStorage spaceStorage;
   private List<Identity> tearDownIdentityList;
   private List<Space> tearDownSpaceList;
+  private List<Relationship> tearDownRelationshipList;
 
   public void setUp() throws Exception {
     super.setUp();
     identityStorage = (IdentityStorage) getContainer().getComponentInstanceOfType(IdentityStorageImpl.class);
     spaceStorage = (SpaceStorage) getContainer().getComponentInstanceOfType(SpaceStorageImpl.class);
+    relationshipStorage = (RelationshipStorage) getContainer().getComponentInstanceOfType(RelationshipStorage.class);
     assertNotNull("identityStorage must not be null", identityStorage);
+    tearDownRelationshipList = new ArrayList<Relationship>();
     tearDownIdentityList = new ArrayList<Identity>();
     tearDownSpaceList = new ArrayList<Space>();
   }
@@ -120,6 +127,44 @@ public class IdentityStorageTest extends AbstractCoreTest {
     }
   }
 
+  /**
+   * Test {@link IdentityStorage#hardDeleteIdentity(Identity)}
+   * 
+   * @throws Exception
+   * @since 1.2.10
+   */
+  public void testHardDeleteIdentity() throws Exception {
+    Identity rootIdentity = new Identity(OrganizationIdentityProvider.NAME, "root");
+    Identity johnIdentity = new Identity(OrganizationIdentityProvider.NAME, "john");
+    Identity maryIdentity = new Identity(OrganizationIdentityProvider.NAME, "mary");
+    Identity demoIdentity = new Identity(OrganizationIdentityProvider.NAME, "demo");
+    
+    identityStorage.saveIdentity(rootIdentity);
+    identityStorage.saveIdentity(johnIdentity);
+    identityStorage.saveIdentity(maryIdentity);
+    identityStorage.saveIdentity(demoIdentity);
+    
+    Relationship rootToJohnRelationship = new Relationship(rootIdentity, johnIdentity, Relationship.Type.CONFIRMED);
+    rootToJohnRelationship = relationshipStorage.saveRelationship(rootToJohnRelationship);
+    
+    Relationship johnToMary = new Relationship(johnIdentity, maryIdentity, Relationship.Type.PENDING);
+    johnToMary = relationshipStorage.saveRelationship(johnToMary);
+    
+    Relationship demoToJohn = new Relationship(demoIdentity, johnIdentity, Relationship.Type.PENDING);
+    demoToJohn = relationshipStorage.saveRelationship(demoToJohn);
+    
+    identityStorage.hardDeleteIdentity(johnIdentity);
+    
+    tearDownRelationshipList.add(rootToJohnRelationship);
+    tearDownRelationshipList.add(johnToMary);
+    tearDownRelationshipList.add(demoToJohn);
+    
+    tearDownIdentityList.add(rootIdentity);
+    tearDownIdentityList.add(johnIdentity);
+    tearDownIdentityList.add(maryIdentity);
+    tearDownIdentityList.add(demoIdentity);
+  }
+  
   /**
    * Tests {@link IdenityStorage#findIdentityById(String)}
    *
